@@ -424,6 +424,9 @@ def find_optimal_stream_number(stream_number_file_dir, engine_file_dir, BatchSiz
 
     qps_prev = -1
     while True:
+        with open(stream_number_file_dir, "w") as tmp_file:
+            tmpStr = "OptNumCUDAStreams = {}\n".format(OptNumCUDAStreams)
+            tmp_file.write(tmpStr)
         OptNumCUDAStreams += 1
 
         trt_engine_gpu_dla0 = get_engine("", engine_file_dir, BatchSize, trt.DeviceType.GPU, {}, 0)
