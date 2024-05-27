@@ -32,7 +32,7 @@ except ModuleNotFoundError:
 
 from jetson_measuring import orin_nx_measuring
 from profiling import profile_network, measure_network_energy, measure_engine_pipeline
-from runtime import ENGINE_PIPELINE
+from runtime import ENGINE_PIPELINE, ENGINE_STREAM
 from mapping import map_network_subgraph
 from calibrator import VOID_CALIBRATOR
 
@@ -378,51 +378,97 @@ def ETOpt(model_name, algorithm = "sliding_window"):
     # idle_power = 5.5 # 系统空载功率 5.6 W
     idle_power = -1.0 # 系统空载功率 -1.0 W, 表示要进行实际测量来确定空载功率
     profile_network(NetworkMap, dictInputTensor, dictTensorShape, idle_power)
-
     time_end = time.time()
     print("\nprofiling duration = {} s\n".format(time_end-time_begin), flush=True)
 
     # exit(0)
 
-    time_begin = time.time()
 
+    time_begin = time.time()
     # 配置 int8 校准
     cache_file_dir = os.path.join(NetworkMap.onnx_folder_dir, NetworkMap.onnx_file_name+"_calibration.cache")
     print("cache_file_dir = {}".format(cache_file_dir), flush=True)
     NumBatches = 8
     my_calibrator = VOID_CALIBRATOR(listInputShape, listRange, BatchSize, NumBatches, cache_file_dir)
-
     # 生成优化的映射和 trt engine
-    engine_pipeline = map_network_subgraph(NetworkMap, my_calibrator)
-
+    opt_engine_file_dir = map_network_subgraph(NetworkMap, BatchSize, my_calibrator)
     time_end = time.time()
     print("\nmapping duration = {} s".format(time_end-time_begin), flush=True)
+
+
+    time_begin = time.time()
+    stream_number_file_dir = os.path.join(NetworkMap.onnx_folder_dir, NetworkMap.onnx_file_name+"_NumStreams.log")
+    OptNumCUDAStreams = find_optimal_stream_number(stream_number_file_dir, opt_engine_file_dir, BatchSize, listInputTensor)
+    time_end = time.time()
+    print("\nfinding number of streams duration = {} s".format(time_end-time_begin), flush=True)
+
+
     print("optimization duration = {} s\n".format(time_end-time_start), flush=True)
 
     # exit(0)
     # return
 
-    # 初始化流水线输入
-    # engine_pipeline.ring_buf.ring_len
-    list_input_nparray = []
-    for _ in range(engine_pipeline.ring_buf.ring_len.value):
-        list_input_nparray.append(copy.deepcopy(listInputTensor))
-    # 第一个维度是buf的idx, 第二个维度是输入的idx
-    engine_pipeline.fillInputBuf(list_input_nparray)
-
-    required_measurement_time = 4 # 测量 4s 左右
-    with orin_nx_measuring(0.05) as OrinNXMeasuring:
-
-        # 测 trt engine pipeline 的 能耗-性能
-        NumExec = measure_engine_pipeline(OrinNXMeasuring, engine_pipeline, required_measurement_time)
-
-        print("{} engine pipeline:".format(NetworkMap.onnx_file_name))
-        print("time = {} s".format(OrinNXMeasuring.measurement_duration.value / NumExec))
-        print("power = {} W".format(OrinNXMeasuring.power_vdd.value))
-        print("energy = {} J".format(OrinNXMeasuring.energy_vdd.value / NumExec))
-        print("qps = {} q/s".format(1/(OrinNXMeasuring.measurement_duration.value / NumExec)))
-
-    del engine_pipeline
-
     sys.stdout = origin_stdout
     sys.stderr = origin_stderr
+
+# 找到最优 CUDA stream 数量
+def find_optimal_stream_number(stream_number_file_dir, engine_file_dir, BatchSize, listInputTensor):
+
+    OptNumCUDAStreams = 0
+    NumDLAs = 2
+    RingLen = 2
+
+    trt_engine_gpu_dla0 = get_engine("", engine_file_dir, BatchSize, trt.DeviceType.GPU, {}, 0)
+    trt_engine_gpu_dla1 = get_engine("", engine_file_dir, BatchSize, trt.DeviceType.GPU, {}, 1)
+    list_engine = [trt_engine_gpu_dla0, trt_engine_gpu_dla1]
+
+    qps_prev = -1
+    while True:
+        OptNumCUDAStreams += 1
+
+        trt_engine_gpu_dla0 = get_engine("", engine_file_dir, BatchSize, trt.DeviceType.GPU, {}, 0)
+        trt_engine_gpu_dla1 = get_engine("", engine_file_dir, BatchSize, trt.DeviceType.GPU, {}, 1)
+        list_engine = [trt_engine_gpu_dla0, trt_engine_gpu_dla1]
+
+        list_pipeline_stage_hybrid_engine = [[]]
+        for i in range(OptNumCUDAStreams):
+            # sub_engine = get_engine("", trt_engine_gpu_dla_file_dir, 1, trt.DeviceType.GPU, {}, i%NumDLAs)
+            list_pipeline_stage_hybrid_engine[0].append(ENGINE_STREAM(list_engine[i%NumDLAs]))
+
+        engine_pipeline_hybrid = ENGINE_PIPELINE(list_pipeline_stage_hybrid_engine, RingLen)
+        # 初始化流水线输入
+        list_input_nparray = []
+        for _ in range(engine_pipeline_hybrid.ring_buf.ring_len.value):
+            list_input_nparray.append(copy.deepcopy(listInputTensor))
+        # 第一个维度是buf的idx, 第二个维度是输入的idx
+        engine_pipeline_hybrid.fillInputBuf(list_input_nparray)
+
+
+        required_measurement_time = 4 # 测量 4s 左右
+        with orin_nx_measuring(0.05) as OrinNXMeasuring:
+
+            # 测 trt engine pipeline 的 能耗-性能
+            NumExec = measure_engine_pipeline(OrinNXMeasuring, engine_pipeline_hybrid, required_measurement_time)
+            qps = 1/(OrinNXMeasuring.measurement_duration.value / NumExec)
+            print("\nNumCUDAStreams = {}".format(OptNumCUDAStreams))
+            print("time = {:.4e} s".format(OrinNXMeasuring.measurement_duration.value / NumExec))
+            print("power = {:.4e} W".format(OrinNXMeasuring.power_vdd.value))
+            print("energy = {:.4e} J".format(OrinNXMeasuring.energy_vdd.value / NumExec))
+            print("qps = {:.3f} q/s".format(qps))
+            print("")
+
+        del engine_pipeline_hybrid, list_pipeline_stage_hybrid_engine, list_engine, trt_engine_gpu_dla0, trt_engine_gpu_dla1
+
+        if qps_prev > qps:
+            OptNumCUDAStreams -= 1
+            print("\nOptNumCUDAStreams = {}\n".format(OptNumCUDAStreams))
+            break
+        else:
+            qps_prev = qps
+
+    with open(stream_number_file_dir, "w") as tmp_file:
+        tmpStr = "OptNumCUDAStreams = {}\n".format(OptNumCUDAStreams)
+        tmp_file.write(tmpStr)
+
+    return OptNumCUDAStreams
+

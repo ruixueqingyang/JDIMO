@@ -39,10 +39,10 @@ if __name__=="__main__":
         print("预设工作路径不存在!")
         exit(1)
 
-    # model_name = "vgg16"
+    model_name = "vgg16"
     # model_name = "vgg19"
     # model_name = "mobilenetv2-7"
-    model_name = "retinanet-9"
+    # model_name = "retinanet-9"
     # model_name = "yolov4"
 
     # model_name = "resnet18-v2-7"

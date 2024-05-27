@@ -183,4 +183,4 @@ if __name__ == "__main__":
     NumBatches = 8
     my_calibrator = VOID_CALIBRATOR(listInputShape, listRange, BatchSize, NumBatches, cache_file_dir)
 
-    engine_pipeline = map_network_manual1(NetworkMap, my_calibrator)
+    engine_pipeline = map_network_manual1(NetworkMap, BatchSize, my_calibrator)

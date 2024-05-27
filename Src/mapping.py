@@ -13,7 +13,7 @@ from trt_engine_memory import get_engine, allocate_buffers, allocate_input_buffe
 from runtime import ENGINE_STREAM, ENGINE_PIPELINE
 TRT_LOGGER = trt.Logger()
 
-def map_network_manual1(NetworkMap, my_calibrator):
+def map_network_manual1(NetworkMap, BatchSize, my_calibrator):
 
     print("map_network_manual1: in", flush=True)
 
@@ -21,11 +21,11 @@ def map_network_manual1(NetworkMap, my_calibrator):
 
     listEngineConfig = loadMappingConfig(mapping_file_dir)
 
-    generateMultiStageEngines(NetworkMap, listEngineConfig, my_calibrator)
+    generateMultiStageEngines(NetworkMap, listEngineConfig, BatchSize, my_calibrator)
 
     return
 
-def map_network_manual(NetworkMap, my_calibrator):
+def map_network_manual(NetworkMap, BatchSize, my_calibrator):
 
     print("map_network_manual: in", flush=True)
 
@@ -51,7 +51,6 @@ def map_network_manual(NetworkMap, my_calibrator):
     # 2. 根据融合节点到 DLA/GPU 的映射方案
     onnx_file_dir = NetworkMap.infered_file_dir
     trt_engine_gpu_dla_file_dir = os.path.join(NetworkMap.onnx_folder_dir, NetworkMap.onnx_file_name + "_gpu_dla_manual.trt")
-    BatchSize = 1
     default_device_type = trt.DeviceType.GPU
 
     trt_engine_gpu_dla0 = get_engine(onnx_file_dir, trt_engine_gpu_dla_file_dir, BatchSize, default_device_type, dictNodeName_Device, 0, my_calibrator)
@@ -113,7 +112,7 @@ def dumpMappingConfig(MappingConfigDir, listEngineConfig):
     with open(MappingConfigDir, "w") as file:
         file.write(mapping_scheme)
 
-def map_network_subgraph(NetworkMap, my_calibrator):
+def map_network_subgraph(NetworkMap, BatchSize, my_calibrator):
     io_energy_discount = 1.0
     ratio_time_dla = 1.0
     ratio_bubble_time = 0.5
@@ -122,7 +121,6 @@ def map_network_subgraph(NetworkMap, my_calibrator):
     sumTimeOnlyGPU = 0.0
     countOnlyGPU = 0
     sumTimeDLA = 0.0
-    tmpSumTimeGPU = 0.0 # 支持 GPU 和 DLA 的节点 在 GPU 上的 运行时间
     print("\nmap_network_subgraph: in")
     print("io_energy_discount = {}".format(io_energy_discount))
     print("ratio_time_dla = {}".format(ratio_time_dla))
@@ -136,7 +134,6 @@ def map_network_subgraph(NetworkMap, my_calibrator):
         if FusedNode.isCanUseDLA == True and FusedNode.isCanUseGPU == True \
             and FusedNode.gpu_profiling.avg_exe_time > 0.0 and FusedNode.dla_profiling.avg_exe_time > 0.0:
             sumTimeDLA += FusedNode.dla_profiling.avg_exe_time
-            # tmpSumTimeGPU += FusedNode.gpu_profiling.avg_exe_time
         else:
             sumTimeOnlyGPU += FusedNode.gpu_profiling.avg_exe_time
             countOnlyGPU += 1
@@ -411,8 +408,6 @@ def map_network_subgraph(NetworkMap, my_calibrator):
         listLayerID = []
         for FusedNode in SelectedSubGraph.list_fused_node:
             for onnx_node in FusedNode.list_onnx_node:
-                dictNodeName_Device[onnx_node.name] = trt.DeviceType.DLA
-                dictNodeName_DeviceName[onnx_node.name] = "DLA"
                 listLayerID.append(NetworkMap.dictNetworkNode[onnx_node.name].id)
         listLayerID.sort()
         EngineConfig = ENGINE_CONFIG("DLA", listLayerID)
@@ -521,6 +516,13 @@ def map_network_subgraph(NetworkMap, my_calibrator):
             i += 1
     # end while
 
+    for EngineConfig in listEngineConfig:
+        if EngineConfig.device == "DLA":
+            for id in EngineConfig.listLayerID:
+                onnx_node = NetworkMap.onnx_model.graph.node[id]
+                dictNodeName_Device[onnx_node.name] = trt.DeviceType.DLA
+                dictNodeName_DeviceName[onnx_node.name] = "DLA"
+
     print("listEngineConfig:")
     for EngineConfig in listEngineConfig:
         print("{}: {}".format(EngineConfig.device, EngineConfig.listLayerID))
@@ -550,14 +552,22 @@ def map_network_subgraph(NetworkMap, my_calibrator):
     # TODO: 这里只生成 trt 文件, 后边设计逻辑, 找合适的 stream 数量
 
     # 2. 根据融合节点到 DLA/GPU 的映射方案
-    generateMultiStageEngines(NetworkMap, listEngineConfig, my_calibrator)
+    # generateMultiStageEngines(NetworkMap, listEngineConfig, BatchSize, my_calibrator)
 
     # exit(0)
 
     suffix = "subgraph"
-    engine_pipeline = loadHybridEnginePipeline(NetworkMap, suffix, dictNodeName_Device, my_calibrator)
+    onnx_file_dir = NetworkMap.infered_file_dir
+    hybrid_engine_file_dir = os.path.join(NetworkMap.onnx_folder_dir, NetworkMap.onnx_file_name + "_gpu_dla_" + suffix + ".trt")
+    default_device_type = trt.DeviceType.GPU
 
-    return engine_pipeline
+    print("\nstart generating trt engine ...", flush=True)
+    trt_engine_gpu_dla = get_engine(onnx_file_dir, hybrid_engine_file_dir, BatchSize, default_device_type, dictNodeName_Device, 0, my_calibrator)
+    print("generating hybrid engine done", flush=True)
+
+    # engine_pipeline = loadHybridEnginePipeline(NetworkMap, BatchSize, suffix, dictNodeName_Device, my_calibrator)
+
+    return hybrid_engine_file_dir
 
 def mergeSubGraph(listCandidateSubGraph, NetworkMap, io_energy_discount, ratio_time_dla, isEnergyEfficiency, ratio_bubble_time, sumTimeGPU, currExeTime, remainingFlexibleTime, currEnergy):
 
@@ -962,10 +972,9 @@ def getSubGraph_Sequence(NetworkMap, dictID_FusedNode, InNodeID):
 
     return listSubGraphNodeID
 
-def loadHybridEnginePipeline(NetworkMap, suffix, dictNodeName_Device, my_calibrator):
+def loadHybridEnginePipeline(NetworkMap, BatchSize, suffix, dictNodeName_Device, my_calibrator):
     onnx_file_dir = NetworkMap.infered_file_dir
     trt_engine_gpu_dla_file_dir = os.path.join(NetworkMap.onnx_folder_dir, NetworkMap.onnx_file_name + "_gpu_dla_" + suffix + ".trt")
-    BatchSize = 1
     default_device_type = trt.DeviceType.GPU
 
     print("\nstart generating trt engine ...", flush=True)
@@ -1106,7 +1115,7 @@ def loadMultiStagePipeline(NetworkMap, listEngineConfig):
 
     return engine_pipeline
 
-def generateMultiStageEngines(NetworkMap, listEngineConfig, my_calibrator):
+def generateMultiStageEngines(NetworkMap, listEngineConfig, BatchSize, my_calibrator):
 
     print("generateMultiStageEngines: in", flush=True)
 
@@ -1162,4 +1171,5 @@ def generateMultiStageEngines(NetworkMap, listEngineConfig, my_calibrator):
             # print("generating GPU-only engine time: {}".format(time_duration), flush=True)
 
     return
+
 

@@ -10,14 +10,14 @@ algorithm = "subgraph"
 # ETOpt(model_name, algorithm)
 
 # 再测测看
-model_name = "googlenet-12"
-ETOpt(model_name, algorithm)
+# model_name = "googlenet-12"
+# ETOpt(model_name, algorithm)
 
 # model_name = "mobilenetv2-7"
 # ETOpt(model_name, algorithm)
 
-# model_name = "vgg16"
-# ETOpt(model_name, algorithm)
+model_name = "vgg16"
+ETOpt(model_name, algorithm)
 
 # model_name = "vgg19"
 # ETOpt(model_name, algorithm)
