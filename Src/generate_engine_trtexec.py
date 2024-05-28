@@ -32,13 +32,7 @@ from runtime import ENGINE_PIPELINE, ENGINE_STREAM
 
 if __name__ == "__main__":
 
-    if os.path.exists("D:\\cloud\\study\\Coding"):
-        WorkDir = "D:\\cloud\\study\\Coding"
-    elif os.path.exists("/home/wfr/Coding"):
-        WorkDir = "/home/wfr/Coding"
-    else:
-        print("预设工作路径不存在!")
-        exit(1)
+    WorkDir = "/home/user_name/work_space"
     engine_folder_dir = os.path.join(WorkDir, "DLA", "onnx_model_zoo", "trtexec_engine")
 
     std2file = False

@@ -28,20 +28,13 @@ from runtime import ENGINE_PIPELINE, ENGINE_STREAM
 
 if __name__=="__main__":
     
-    if os.path.exists("D:\\cloud\\study\\Coding"):
-        WorkDir = "D:\\cloud\\study\\Coding"
-    elif os.path.exists("/home/wfr/Coding"):
-        WorkDir = "/home/wfr/Coding"
-    else:
-        print("预设工作路径不存在!")
-        exit(1)
+    WorkDir = "/home/user_name/work_space"
 
     # model_name = "vgg16"
     # model_name = "vgg19"
     # model_name = "mobilenetv2-7"
     model_name = "retinanet-9"
     # model_name = "yolov4"
-    # model_name = "googlenet-12"
 
     BatchSize = 1
     listUnknownDims = []
@@ -50,23 +43,7 @@ if __name__=="__main__":
     listInputTensor = []
     list_input_nparray = []
 
-    if model_name == "googlenet-12":
-        # googlenet-12 相关路径
-        input_folder_dir = os.path.join(WorkDir, "DLA", "onnx_model_zoo", "googlenet-12")
-        output_folder_dir = os.path.join(WorkDir, "DLA", "onnx_model_zoo", "googlenet-12", "opt")
-        onnx_file_dir = os.path.join(input_folder_dir, "googlenet-12.onnx")
-        BatchSize = 1
-        listUnknownDims = []
-        dictInputTensor["data_0"] = np.random.random([1,3,224,224]).astype(np.float32) * 255
-        listInputTensor = [dictInputTensor["data_0"]]
-        listInputShape = [[1,3,224,224]]
-        listRange = [[0, 255]]
-
-        RingLen = 2
-
-        trt_engine_gpu_file_dir = os.path.join(WorkDir, "DLA", "onnx_model_zoo", "googlenet-12", "googlenet-12_gpu.trt")
-
-    elif model_name == "retinanet-9":
+    if model_name == "retinanet-9":
         # retinanet-9 相关路径
         input_folder_dir = os.path.join(WorkDir, "DLA", "onnx_model_zoo", "retinanet-9")
         onnx_file_dir = os.path.join(input_folder_dir, "retinanet-9.onnx")

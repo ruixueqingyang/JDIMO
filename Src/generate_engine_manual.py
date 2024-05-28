@@ -37,20 +37,13 @@ from calibrator import VOID_CALIBRATOR
 
 if __name__ == "__main__":
 
-    if os.path.exists("D:\\cloud\\study\\Coding"):
-        WorkDir = "D:\\cloud\\study\\Coding"
-    elif os.path.exists("/home/wfr/Coding"):
-        WorkDir = "/home/wfr/Coding"
-    else:
-        print("预设工作路径不存在!")
-        exit(1)
+    WorkDir = "/home/user_name/work_space"
 
     # model_name = "vgg16"
     # model_name = "vgg19"
     # model_name = "mobilenetv2-7"
     model_name = "retinanet-9"
     # model_name = "yolov4"
-    # model_name = "googlenet-12"
 
     BatchSize = 1
     listUnknownDims = []
@@ -62,24 +55,7 @@ if __name__ == "__main__":
     origin_stderr = sys.stderr
     std2file = False
 
-    if model_name == "googlenet-12":
-        # googlenet-12 相关路径
-        input_folder_dir = os.path.join(WorkDir, "DLA", "onnx_model_zoo", "googlenet-12")
-        output_folder_dir = os.path.join(WorkDir, "DLA", "onnx_model_zoo", "googlenet-12", "opt")
-        onnx_file_dir = os.path.join(input_folder_dir, "googlenet-12.onnx")
-        if std2file == True:
-            sys.stdout = open(os.path.join(input_folder_dir, "googlenet-12_profiling_manual.log"), "w", encoding='utf-8')
-            sys.stderr = sys.stdout
-        BatchSize = 1
-        listUnknownDims = []
-        dictInputTensor["data_0"] = np.random.random([1,3,224,224]).astype(np.float32) * 255
-        listInputTensor = [dictInputTensor["data_0"]]
-        listInputShape = [[1,3,224,224]]
-        listRange = [[0, 255]]
-
-        useless_prefix = ""
-
-    elif model_name == "retinanet-9":
+    if model_name == "retinanet-9":
         # retinanet-9 相关路径
         input_folder_dir = os.path.join(WorkDir, "DLA", "onnx_model_zoo", "retinanet-9")
         output_folder_dir = os.path.join(WorkDir, "DLA", "onnx_model_zoo", "retinanet-9", "opt")
