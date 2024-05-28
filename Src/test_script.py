@@ -13,6 +13,8 @@ ETOpt(model_name, algorithm)
 
 # model_name = "mobilenetv2-7"
 # ETOpt(model_name, algorithm)
+model_name = "vgg16"
+ETOpt(model_name, algorithm)
 
 # model_name = "retinanet-9"
 # ETOpt(model_name, algorithm)

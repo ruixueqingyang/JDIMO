@@ -30,10 +30,10 @@ if __name__=="__main__":
     
     WorkDir = "/home/user_name/work_space"
 
-    # model_name = "vgg16"
+    model_name = "vgg16"
     # model_name = "vgg19"
     # model_name = "mobilenetv2-7"
-    model_name = "retinanet-9"
+    # model_name = "retinanet-9"
     # model_name = "yolov4"
 
     BatchSize = 1
