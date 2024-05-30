@@ -1,12 +1,5 @@
 # coding=utf-8
 import os
-# import copy
-# import onnx
-# import onnx.version_converter
-# import onnxruntime
-# import numpy as np
-# import torch
-# import argparse
 import tensorrt as trt
 
 # Use autoprimaryctx if available (pycuda >= 2021.1) to

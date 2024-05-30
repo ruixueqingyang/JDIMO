@@ -9,12 +9,8 @@ from timeit import default_timer as timer # 实际上是调用了 time.perf_coun
 import onnx
 import onnx.version_converter
 import onnxruntime
-import sys, getopt
 import numpy as np
-# import torch
-import copy
 import json, re
-# import joblib
 from trt_engine_memory import get_engine, allocate_buffers
 import tensorrt as trt
 # TRT_LOGGER_PROFILING = trt.Logger(trt.Logger.VERBOSE)

@@ -5,10 +5,7 @@
 
 import os, math
 from time import time
-# from queue import Queue
 from multiprocessing import Queue, Process, Manager, Value, shared_memory
-# from threading import Thread
-from typing import Any
 import onnx
 import onnx.version_converter
 import onnxruntime
@@ -16,9 +13,8 @@ import sys, getopt
 import numpy as np
 import torch
 import copy
-from enum import Enum
 import tensorrt as trt
-from trt_engine_memory import get_engine, allocate_buffers, allocate_input_buffers, allocate_output_buffers, HostDeviceMem
+from trt_engine_memory import HostDeviceMem
 
 # Use autoprimaryctx if available (pycuda >= 2021.1) to
 # prevent issues with other modules that rely on the primary

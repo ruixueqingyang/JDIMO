@@ -3,11 +3,7 @@ import numpy as np
 from timeit import default_timer as timer # 实际上是调用了 time.perf_counter() 返回高精度时间
 from multiprocessing import Process, Lock
 import multiprocessing
-# import psutil
 import time
-# import os
-# import ctypes
-import pylibi2c
 from pylibi2c import I2CDevice
 
 

@@ -172,8 +172,9 @@ class network_map:
 #       }
 
     # list_input_dim: 用来设置 模型输入 tensor 中未知维度
-    def __init__(self, onnx_file_dir, list_input_dim=[], useless_prefix=""):
-        self.list_input_dim = list_input_dim
+    def __init__(self, onnx_file_dir, dictUnknownShape={}, useless_prefix=""):
+        # self.list_input_dim = list_input_dim
+        self.dictUnknownShape = dictUnknownShape
         self.onnx_file_dir = onnx_file_dir # 源 onnx 模型文件路径
         tmpStr = os.path.split(onnx_file_dir)
         self.onnx_folder_dir = tmpStr[0] # onnx 文件所在文件夹
@@ -208,10 +209,15 @@ class network_map:
             if tmp_flag == True: 
                 self.listUnknownDimInputName.append(input_tensor.name)
 
-        # 检查 未知维度数量 是否等于 输入维度数量
-        if self.unknown_dim_count != len(list_input_dim):
-            print("ERROR: The model contains {} unknown dimensions. But {} dimensions are given.".format(self.unknown_dim_count, len(list_input_dim)))
+        # 检查 含有未知维度输入变量的数量 是否等于 dictUnknownShape 给出的shape数量
+        if len(self.listUnknownDimInputName) != len(self.dictUnknownShape):
+            print("ERROR: The model contains {} unknown input shapes. But {} shapes are given.".format(len(self.listUnknownDimInputName), len(self.dictUnknownShape)))
             exit(1)
+
+        # # 检查 未知维度数量 是否等于 输入维度数量
+        # if self.unknown_dim_count != len(list_input_dim):
+        #     print("ERROR: The model contains {} unknown dimensions. But {} dimensions are given.".format(self.unknown_dim_count, len(list_input_dim)))
+        #     exit(1)
 
         self.onnx_model = onnx.load(onnx_file_dir) # 加载 onnx 模型
         onnx.checker.check_model(self.onnx_model) # 检查 onnx 模型
@@ -280,19 +286,24 @@ class network_map:
         for input in self.onnx_model.graph.input:
             self.dictInput[input.name] = input
         # 使用 给定的维度信息 设置 输入 tensor 中的未知维度
-        dim_count = 0
-        for input_name in self.listUnknownDimInputName:
-            tmp_input = self.dictInput[input_name]
-            for dim in tmp_input.type.tensor_type.shape.dim:
+        # dim_count = 0
+        # for input_name in self.listUnknownDimInputName:
+        #     tmp_input = self.dictInput[input_name]
+        #     for dim in tmp_input.type.tensor_type.shape.dim:
+        #         if dim.dim_value < 1:
+        #             # print("list_input_dim[{}] = {}".format(dim_count, self.list_input_dim[dim_count]))
+        #             # print("dim.dim_value = {}, dim.dim_param = {}".format(dim.dim_value, dim.dim_param))
+        #             # dim.dim_param = "" # 只对 dim_param / dim_value 其中一个赋值, 这个结构 似乎类似 C语言的 共用体(union), 多种类型共用同一块内存空间
+        #             dim.dim_value = self.list_input_dim[dim_count]
+        #             dim_count += 1
+
+        for input in self.onnx_model.graph.input:
+            InputShape = []
+            for j in range(len(input.type.tensor_type.shape.dim)):
+                dim = input.type.tensor_type.shape.dim[j]
                 if dim.dim_value < 1:
-                    # print("list_input_dim[{}] = {}".format(dim_count, self.list_input_dim[dim_count]))
-                    # print("dim.dim_value = {}, dim.dim_param = {}".format(dim.dim_value, dim.dim_param))
-                    # dim.dim_param = "" # 只对 dim_param / dim_value 其中一个赋值, 这个结构 似乎类似 C语言的 共用体(union), 多种类型共用同一块内存空间
-                    dim.dim_value = self.list_input_dim[dim_count]
-                    dim_count += 1
-                    # print("dim.dim_value = {}, dim.dim_param = {}\n".format(dim.dim_value, dim.dim_param))
-        # UnknownInput.type.tensor_type.shape.dim[0].dim_param
-        # UnknownInput.type.tensor_type.shape.dim[0].dim_value
+                    dim.dim_value = self.dictUnknownShape[input.name][j]
+                InputShape.append(dim.dim_value)
 
         # 推理中间变量 shape 存到 value_info
         self.onnx_model = onnx.shape_inference.infer_shapes(self.onnx_model)

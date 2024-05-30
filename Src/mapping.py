@@ -6,10 +6,10 @@
 import os, json, functools, re, copy
 import numpy as np
 import onnx
-from network_type import network_map, SUB_GRAPH, createMergedSubGraph, canUseDLA_GPU
+from network_type import network_map, SUB_GRAPH, createMergedSubGraph
 import tensorrt as trt
 from profiling import get_legal_name
-from trt_engine_memory import get_engine, allocate_buffers, allocate_input_buffers, allocate_output_buffers
+from trt_engine_memory import get_engine
 from runtime import ENGINE_STREAM, ENGINE_PIPELINE
 TRT_LOGGER = trt.Logger()
 

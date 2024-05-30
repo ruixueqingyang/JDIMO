@@ -9,8 +9,8 @@ import torch
 import copy
 import onnx
 import tensorrt as trt
-from trt_engine_memory import get_engine, allocate_buffers, allocate_input_buffers, allocate_output_buffers
-from mapping import ENGINE_CONFIG, loadMappingConfig
+from trt_engine_memory import get_engine
+from mapping import loadMappingConfig
 # from tmp_engine import tmp_measure_network_energy
 
 # Use autoprimaryctx if available (pycuda >= 2021.1) to
